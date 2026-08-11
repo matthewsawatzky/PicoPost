@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -93,6 +94,9 @@ func Default() Config {
 	}
 }
 
+// ErrMissingFile is returned by Load when the config file does not exist.
+var ErrMissingFile = errors.New("config file not found")
+
 // Load reads the config file at path, applies defaults for unset values,
 // and validates the result. A missing file is an error.
 func Load(path string) (Config, error) {
@@ -100,6 +104,9 @@ func Load(path string) (Config, error) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return Config{}, fmt.Errorf("%w: %s", ErrMissingFile, path)
+		}
 		return Config{}, fmt.Errorf("read config: %w", err)
 	}
 

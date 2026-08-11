@@ -1,0 +1,224 @@
+package main
+
+import (
+	"bufio"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/matthewsawatzky/PicoPost/internal/config"
+)
+
+// exampleConfigPath returns the path of the example config shipped with
+// the repo, or "" if it cannot be found.
+func exampleConfigPath() string {
+	// Try the repo layout first (source builds), then a sibling of the
+	// binary (release installs).
+	candidates := []string{
+		"config/picopost.example.toml",
+		filepath.Join(filepath.Dir(os.Args[0]), "picopost.example.toml"),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			abs, err := filepath.Abs(c)
+			if err == nil {
+				return abs
+			}
+			return c
+		}
+	}
+	return "config/picopost.example.toml"
+}
+
+// cmdSetup runs the interactive setup wizard. It writes a picopost.toml
+// with the user's answers and validates the result.
+func cmdSetup(args []string) error {
+	fs := flag.NewFlagSet("setup", flag.ExitOnError)
+	cfgPath := fs.String("config", "", "path to write the config (default ./picopost.toml)")
+	fs.Parse(args)
+
+	path := *cfgPath
+	if path == "" {
+		path = "picopost.toml"
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(abs); err == nil {
+		return fmt.Errorf("config already exists at %s; move it away and re-run setup", abs)
+	}
+
+	// Non-interactive mode: stdin is not a terminal.
+	if !isTerminal(os.Stdin) {
+		return fmt.Errorf("setup is interactive; run it in a terminal")
+	}
+
+	in := bufio.NewReader(os.Stdin)
+	cfg := config.Default()
+
+	fmt.Println("PicoPost setup")
+	fmt.Println("==============")
+	fmt.Println("Press Enter to accept the default shown in [brackets].")
+	fmt.Println()
+
+	cfg.Server.Listen = ask(in, "Listen address", cfg.Server.Listen)
+	cfg.Storage.Database = ask(in, "Database path", cfg.Storage.Database)
+
+	fmt.Println()
+	fmt.Println("CORS: origins allowed to call the API from browsers.")
+	fmt.Println("Enter one per line; blank line when done. Use * for public mode.")
+	cfg.CORS.Origins = askList(in, "Allowed origin")
+
+	fmt.Println()
+	cfg.Posts.MaxBodyBytes = askInt(in, "Max request body bytes", cfg.Posts.MaxBodyBytes)
+	cfg.Posts.MaxTextBytes = askInt(in, "Max text bytes", cfg.Posts.MaxTextBytes)
+	cfg.Posts.MaxMetadataBytes = askInt(in, "Max metadata bytes", cfg.Posts.MaxMetadataBytes)
+	cfg.Posts.MaxMetadataKeys = askInt(in, "Max metadata keys", cfg.Posts.MaxMetadataKeys)
+	cfg.Posts.MaxURLsPerPost = askInt(in, "Max URLs per post", cfg.Posts.MaxURLsPerPost)
+	cfg.Posts.PageSize = askInt(in, "Default page size", cfg.Posts.PageSize)
+
+	fmt.Println()
+	cfg.Identity.Anonymous = askBool(in, "Allow anonymous posting", cfg.Identity.Anonymous)
+	cfg.Identity.Browser = askBool(in, "Allow browser identities", cfg.Identity.Browser)
+
+	fmt.Println()
+	cfg.RateLimit.PostsPerMinute = askInt(in, "Posts per minute per IP", cfg.RateLimit.PostsPerMinute)
+	cfg.RateLimit.TrustForwarded = askBool(in, "Trust X-Forwarded-For (only behind a reverse proxy)", cfg.RateLimit.TrustForwarded)
+
+	fmt.Println()
+	fmt.Println("Username deny list (reserved names). One per line; blank when done.")
+	cfg.Filters.Username.Deny = askList(in, "Denied username")
+	fmt.Println("Text deny list (blocked phrases). One per line; blank when done.")
+	cfg.Filters.Text.Deny = askList(in, "Denied phrase")
+
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	if err := writeConfigFile(abs, cfg); err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Println("Config written to", abs)
+	fmt.Println("Next steps:")
+	fmt.Println("  picopost check --config " + abs)
+	fmt.Println("  picopost serve --config " + abs)
+	return nil
+}
+
+func ask(in *bufio.Reader, label, def string) string {
+	fmt.Printf("%s [%s]: ", label, def)
+	line, _ := in.ReadString('\n')
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return def
+	}
+	return line
+}
+
+func askInt(in *bufio.Reader, label string, def int) int {
+	for {
+		fmt.Printf("%s [%d]: ", label, def)
+		line, _ := in.ReadString('\n')
+		line = strings.TrimSpace(line)
+		if line == "" {
+			return def
+		}
+		n, err := strconv.Atoi(line)
+		if err == nil {
+			return n
+		}
+		fmt.Println("  please enter a number")
+	}
+}
+
+func askBool(in *bufio.Reader, label string, def bool) bool {
+	defStr := "y"
+	if !def {
+		defStr = "n"
+	}
+	for {
+		fmt.Printf("%s (y/n) [%s]: ", label, defStr)
+		line, _ := in.ReadString('\n')
+		line = strings.ToLower(strings.TrimSpace(line))
+		if line == "" {
+			return def
+		}
+		switch line {
+		case "y", "yes":
+			return true
+		case "n", "no":
+			return false
+		}
+		fmt.Println("  please answer y or n")
+	}
+}
+
+func askList(in *bufio.Reader, label string) []string {
+	var out []string
+	for {
+		fmt.Printf("%s (blank to finish): ", label)
+		line, _ := in.ReadString('\n')
+		line = strings.TrimSpace(line)
+		if line == "" {
+			return out
+		}
+		out = append(out, line)
+	}
+}
+
+func writeConfigFile(path string, cfg config.Config) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# PicoPost configuration, generated by \"picopost setup\".\n")
+	fmt.Fprintf(&b, "\n[server]\nlisten = %q\n\n", cfg.Server.Listen)
+	fmt.Fprintf(&b, "[storage]\ndatabase = %q\n\n", cfg.Storage.Database)
+	fmt.Fprintf(&b, "[cors]\norigins = [\n")
+	for _, o := range cfg.CORS.Origins {
+		fmt.Fprintf(&b, "  %q,\n", o)
+	}
+	fmt.Fprintf(&b, "]\n\n")
+	fmt.Fprintf(&b, "[posts]\n")
+	fmt.Fprintf(&b, "max_body_bytes = %d\n", cfg.Posts.MaxBodyBytes)
+	fmt.Fprintf(&b, "max_text_bytes = %d\n", cfg.Posts.MaxTextBytes)
+	fmt.Fprintf(&b, "max_metadata_bytes = %d\n", cfg.Posts.MaxMetadataBytes)
+	fmt.Fprintf(&b, "max_metadata_keys = %d\n", cfg.Posts.MaxMetadataKeys)
+	fmt.Fprintf(&b, "max_key_length = %d\n", cfg.Posts.MaxKeyLength)
+	fmt.Fprintf(&b, "max_urls_per_post = %d\n", cfg.Posts.MaxURLsPerPost)
+	fmt.Fprintf(&b, "page_size = %d\n\n", cfg.Posts.PageSize)
+	fmt.Fprintf(&b, "[identity]\nanonymous = %t\nbrowser = %t\n\n", cfg.Identity.Anonymous, cfg.Identity.Browser)
+	fmt.Fprintf(&b, "[rate_limit]\nposts_per_minute = %d\n", cfg.RateLimit.PostsPerMinute)
+	fmt.Fprintf(&b, "trust_forwarded = %t\n\n", cfg.RateLimit.TrustForwarded)
+	fmt.Fprintf(&b, "[filters.username]\ndeny = [\n")
+	for _, d := range cfg.Filters.Username.Deny {
+		fmt.Fprintf(&b, "  %q,\n", d)
+	}
+	fmt.Fprintf(&b, "]\n\n")
+	fmt.Fprintf(&b, "[filters.text]\ndeny = [\n")
+	for _, d := range cfg.Filters.Text.Deny {
+		fmt.Fprintf(&b, "  %q,\n", d)
+	}
+	fmt.Fprintf(&b, "]\n")
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
+	}
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+	return nil
+}
+
+// isTerminal reports whether f is a terminal (interactive input).
+func isTerminal(f *os.File) bool {
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
+}

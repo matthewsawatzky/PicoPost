@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -42,6 +43,8 @@ func run(args []string) error {
 		return nil
 	case "check":
 		return cmdCheck(args[1:])
+	case "setup":
+		return cmdSetup(args[1:])
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -56,6 +59,7 @@ func usage() {
 Usage:
   picopost serve [--config <path>]   run the HTTP server
   picopost check [--config <path>]    validate config and database, then exit
+  picopost setup [--config <path>]    interactive setup wizard
   picopost version                   print the version
   picopost help                      show this help
 
@@ -86,6 +90,9 @@ func cmdServe(args []string) error {
 	}
 	cfg, err := config.Load(path)
 	if err != nil {
+		if errors.Is(err, config.ErrMissingFile) {
+			return fmt.Errorf("no config file at %s\n\n  Run \"picopost setup\" to create one interactively, or copy the example:\n  cp %s %s", path, exampleConfigPath(), path)
+		}
 		return err
 	}
 
@@ -132,6 +139,9 @@ func cmdCheck(args []string) error {
 	}
 	cfg, err := config.Load(path)
 	if err != nil {
+		if errors.Is(err, config.ErrMissingFile) {
+			return fmt.Errorf("no config file at %s\n\n  Run \"picopost setup\" to create one interactively, or copy the example:\n  cp %s %s", path, exampleConfigPath(), path)
+		}
 		return err
 	}
 	fmt.Printf("config: OK (%s)\n", path)

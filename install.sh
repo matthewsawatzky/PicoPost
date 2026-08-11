@@ -25,6 +25,26 @@ FORCE_SOURCE="${PICOPOST_SOURCE:-0}"
 say() { printf '\033[1;34m%s\033[0m\n' "$*"; }
 die() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; exit 1; }
 
+# maybe_setup <binary> — ask whether to run the interactive setup wizard.
+# Only prompts when stdin is a terminal.
+maybe_setup() {
+  local bin="$1"
+  if [ ! -t 0 ]; then
+    say "tip: run \"$bin setup\" to create a picopost.toml interactively"
+    return
+  fi
+  printf 'Run the interactive setup wizard now to create a picopost.toml? [y/N] '
+  read -r answer
+  case "$answer" in
+    y|Y|yes)
+      "$bin" setup
+      ;;
+    *)
+      say "ok — run \"$bin setup\" whenever you are ready"
+      ;;
+  esac
+}
+
 # --- destination ----------------------------------------------------------
 
 # Default: the directory where the script is run.
@@ -78,6 +98,7 @@ if [ -n "$VERSION" ] && [ "$FORCE_SOURCE" != "1" ]; then
     rm -rf "$tmpdir"
     say "installed picopost $VERSION to $DEST/picopost"
     "$DEST/picopost" version
+    maybe_setup "$DEST/picopost"
     exit 0
   fi
   rm -rf "$tmpdir"
@@ -116,3 +137,4 @@ say "building picopost $SRC_VERSION from source"
 say "installed picopost $SRC_VERSION to $DEST/picopost"
 say "source is at $SRC_DIR"
 "$DEST/picopost" version
+maybe_setup "$DEST/picopost"
