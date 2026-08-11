@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PicoPost — Usage</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="index.html">Pico<span>Post</span></a>
+    <nav>
+      <a href="index.html">Demo</a>
+      <a href="usage.html" class="active">Usage</a>
+      <a href="setup.html">Server setup</a>
+    </nav>
+  </div>
+
+  <main class="docs">
+    <div class="hero">
+      <h1>Usage</h1>
+      <p>Add comments, chat, reviews, or a guestbook to your site with a script tag and a few lines of JavaScript.</p>
+    </div>
+
+    <h2>1. Include the client</h2>
+    <p>Serve <code>picopost.js</code> from your PicoPost server (it is also in the repo at <code>web/picopost.js</code>), or copy it into your own static assets. No npm, no build step.</p>
+    <pre><button class="copy-btn" data-copy="snippet-include">Copy</button><code id="snippet-include">&lt;script src="https://posts.example.com/picopost.js"&gt;&lt;/script&gt;</code></pre>
+
+    <h2>2. Initialize</h2>
+    <p>Point the client at your server and pick a channel. Channels are just validated strings like <code>chat/general</code>, <code>comments/article-123</code>, or <code>reviews/homepage</code> — you decide the naming scheme.</p>
+    <pre><button class="copy-btn" data-copy="snippet-init">Copy</button><code id="snippet-init">PicoPost.init({
+  server: "https://posts.example.com",
+  channel: "comments/article-123"
+});</code></pre>
+
+    <h2>3. Send posts</h2>
+    <pre><button class="copy-btn" data-copy="snippet-send">Copy</button><code id="snippet-send">// Plain text
+PicoPost.send("Really nice article!");
+
+// With metadata (any JSON you like)
+PicoPost.send("Loved it", { stars: 5, type: "review" });
+
+// Anonymous post with an untrusted display name
+PicoPost.sendAnon("Signed the guestbook", null, "Guest");</code></pre>
+
+    <h2>4. Read posts</h2>
+    <pre><button class="copy-btn" data-copy="snippet-list">Copy</button><code id="snippet-list">PicoPost.list().then(function (posts) {
+  posts.forEach(function (post) {
+    console.log(post.display_name || "anonymous", ":", post.text);
+  });
+});
+
+// Pagination: pass the last post of the previous page as the cursor
+PicoPost.list({ limit: 20, before: last.created_at, before_id: last.id });</code></pre>
+
+    <h2>5. Live updates</h2>
+    <p>Subscribe to receive new posts the moment they are accepted. The client reconnects automatically.</p>
+    <pre><button class="copy-btn" data-copy="snippet-sub">Copy</button><code id="snippet-sub">PicoPost.subscribe(function (post) {
+  appendPost(post); // your rendering code
+});</code></pre>
+
+    <h2>6. Identities</h2>
+    <p>On first use the client creates a browser identity and stores the secret key in <code>localStorage</code>. It restores the identity on later visits and authenticates automatically — no login screen, no accounts.</p>
+    <pre><button class="copy-btn" data-copy="snippet-ident">Copy</button><code id="snippet-ident">PicoPost.identity.get().then(function (ident) {
+  console.log("I am", ident.id);
+});
+
+// Let the visitor choose a display name
+PicoPost.identity.setName("Mat").then(function () {
+  // future posts are attributed to "Mat" by the server
+});
+
+// Forget the identity (a new one is created on next use)
+PicoPost.identity.reset();</code></pre>
+    <div class="callout warn">
+      The server decides who a post belongs to. A visitor cannot change
+      <code>name = "Admin"</code> in DevTools and impersonate someone —
+      client-supplied names are ignored for authenticated identities.
+    </div>
+
+    <h2>7. Multiple widgets on one page</h2>
+    <p>Each <code>PicoPost.create()</code> call returns an independent instance with its own identity, stream, and channel.</p>
+    <pre><button class="copy-btn" data-copy="snippet-multi">Copy</button><code id="snippet-multi">var chat = PicoPost.create({ server: "https://posts.example.com", channel: "chat/general" });
+var reviews = PicoPost.create({ server: "https://posts.example.com", channel: "reviews/homepage" });
+
+chat.send("hello");
+reviews.send("Great", { stars: 5 });</code></pre>
+
+    <h2>8. The HTTP API</h2>
+    <p>Everything the client does is plain HTTP, so you can call it from anywhere.</p>
+    <table>
+      <tr><th>Endpoint</th><th>Purpose</th></tr>
+      <tr><td><code>GET /health</code></td><td>liveness check</td></tr>
+      <tr><td><code>POST /v1/identity</code></td><td>create a browser identity → <code>{id, key}</code></td></tr>
+      <tr><td><code>GET /v1/identity</code></td><td>fetch your identity (Bearer auth)</td></tr>
+      <tr><td><code>PATCH /v1/identity</code></td><td>set display name: <code>{"name": "Mat"}</code></td></tr>
+      <tr><td><code>POST /v1/posts</code></td><td>create a post</td></tr>
+      <tr><td><code>GET /v1/posts</code></td><td>list posts (<code>channel</code>, <code>limit</code>, <code>before</code>, <code>before_id</code>)</td></tr>
+      <tr><td><code>GET /v1/posts/{id}</code></td><td>fetch one post</td></tr>
+      <tr><td><code>GET /v1/stream</code></td><td>SSE live stream (<code>?channel=…</code>)</td></tr>
+    </table>
+    <pre><button class="copy-btn" data-copy="snippet-curl">Copy</button><code id="snippet-curl"># Create a post
+curl -X POST https://posts.example.com/v1/posts \
+  -H "Content-Type: application/json" \
+  -d '{"channel":"chat/general","text":"hello","meta":{"stars":5}}'
+
+# List a channel
+curl "https://posts.example.com/v1/posts?channel=chat/general&limit=20"
+
+# Live stream
+curl -N "https://posts.example.com/v1/stream?channel=chat/general"</code></pre>
+
+    <h2>9. Errors</h2>
+    <p>Errors are small JSON objects with a stable code:</p>
+    <pre><button class="copy-btn" data-copy="snippet-err">Copy</button><code id="snippet-err">{
+  "error": "post_rejected"
+}</code></pre>
+    <table>
+      <tr><th>Code</th><th>Meaning</th></tr>
+      <tr><td><code>invalid_request</code></td><td>malformed JSON, bad field, or a limit was exceeded</td></tr>
+      <tr><td><code>payload_too_large</code></td><td>request body exceeded <code>max_body_bytes</code> (HTTP 413)</td></tr>
+      <tr><td><code>post_rejected</code></td><td>a filter matched (text, username, or URL count)</td></tr>
+      <tr><td><code>rate_limited</code></td><td>too many posts from this IP (HTTP 429)</td></tr>
+      <tr><td><code>unauthorized</code></td><td>missing or invalid identity key</td></tr>
+      <tr><td><code>not_found</code></td><td>no such post</td></tr>
+      <tr><td><code>invalid_channel</code></td><td>channel name has invalid characters</td></tr>
+    </table>
+
+    <h2>10. CORS</h2>
+    <p>Your site and the PicoPost server are usually on different domains. Add your site's origin to <code>[cors] origins</code> in the server config and the browser will be allowed to call the API. Preflight requests are handled automatically.</p>
+    <pre><button class="copy-btn" data-copy="snippet-cors">Copy</button><code id="snippet-cors">[cors]
+origins = [
+  "https://example.com",
+  "https://your-site.pages.dev"
+]</code></pre>
+
+    <h2>Next steps</h2>
+    <p>See <a href="setup.html">Server setup</a> to run your own PicoPost instance, or read the full documentation in the <a href="https://github.com/matthewsawatzky/PicoPost">repository</a>.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/matthewsawatzky/PicoPost">PicoPost on GitHub</a> · tiny text infrastructure for the web
+  </footer>
+
+  <script>
+    document.querySelectorAll(".copy-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var code = document.getElementById(btn.dataset.copy);
+        navigator.clipboard.writeText(code.textContent).then(function () {
+          btn.textContent = "Copied";
+          setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+        });
+      });
+    });
+  </script>
+</body>
+</html>

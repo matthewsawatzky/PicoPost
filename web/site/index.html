@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PicoPost — Live demo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="index.html">Pico<span>Post</span></a>
+    <nav>
+      <a href="index.html" class="active">Demo</a>
+      <a href="usage.html">Usage</a>
+      <a href="setup.html">Server setup</a>
+    </nav>
+  </div>
+
+  <main>
+    <div class="hero">
+      <h1>Live demo</h1>
+      <p>Five real widgets built on the same tiny post API: a chatroom, comments, reviews, an agent-style help desk, and a guestbook. Open this page in two windows and watch posts arrive live over SSE.</p>
+    </div>
+
+    <div class="banner" id="config-banner">
+      This demo talks to a PicoPost server. If you run one locally, set the
+      server URL below. Otherwise use the public demo server
+      <code>https://picopost-demo.fly.dev</code>.
+    </div>
+
+    <div class="identity-bar">
+      <span class="who" id="who">Identity: <strong>loading…</strong></span>
+      <input id="name-input" type="text" maxlength="32" placeholder="Display name" autocomplete="off">
+      <button id="set-name">Set name</button>
+      <button id="reset-identity" class="secondary">Reset identity</button>
+    </div>
+
+    <div class="card wide">
+      <h2>Server <span class="badge" id="conn-badge">connecting</span></h2>
+      <p class="sub">Point the demo at your own PicoPost instance, or keep the public one.</p>
+      <div class="row">
+        <input id="server-input" type="text" value="https://picopost-demo.fly.dev" autocomplete="off" spellcheck="false">
+        <button id="server-apply">Connect</button>
+      </div>
+      <div id="server-error" class="error" hidden></div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Chatroom <span class="badge">live</span></h2>
+        <p class="sub">channel <code>chat/general</code> — everyone connected sees messages instantly.</p>
+        <ul class="posts" id="chat-posts"></ul>
+        <form class="row" id="chat-form">
+          <input type="text" maxlength="768" placeholder="Message…" autocomplete="off">
+          <button type="submit">Send</button>
+        </form>
+        <div class="error" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>Comments</h2>
+        <p class="sub">channel <code>comments/article-1</code> — with reply-to metadata.</p>
+        <ul class="posts" id="comments-posts"></ul>
+        <form class="row" id="comments-form">
+          <input type="text" maxlength="768" placeholder="Add a comment…" autocomplete="off">
+          <button type="submit">Post</button>
+        </form>
+        <div class="error" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>Reviews</h2>
+        <p class="sub">channel <code>reviews/homepage</code> — star rating stored as metadata.</p>
+        <ul class="posts" id="reviews-posts"></ul>
+        <form id="reviews-form">
+          <div class="row">
+            <select id="reviews-stars" aria-label="Star rating">
+              <option value="5">★★★★★</option>
+              <option value="4">★★★★</option>
+              <option value="3">★★★</option>
+              <option value="2">★★</option>
+              <option value="1">★</option>
+            </select>
+            <input type="text" maxlength="768" placeholder="Your review…" autocomplete="off">
+            <button type="submit">Review</button>
+          </div>
+        </form>
+        <div class="error" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>Agent help <span class="badge">bot</span></h2>
+        <p class="sub">channel <code>agent/help</code> — a scripted bot replies to questions.</p>
+        <ul class="posts" id="agent-posts"></ul>
+        <form class="row" id="agent-form">
+          <input type="text" maxlength="768" placeholder="Ask something…" autocomplete="off">
+          <button type="submit">Ask</button>
+        </form>
+        <div class="error" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>Guestbook</h2>
+        <p class="sub">channel <code>guestbook/main</code> — sign it, reload, it stays.</p>
+        <ul class="posts" id="guestbook-posts"></ul>
+        <form class="row" id="guestbook-form">
+          <input type="text" maxlength="768" placeholder="Sign the guestbook…" autocomplete="off">
+          <button type="submit">Sign</button>
+        </form>
+        <div class="error" hidden></div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <a href="https://github.com/matthewsawatzky/PicoPost">PicoPost on GitHub</a> · tiny text infrastructure for the web
+  </footer>
+
+  <script src="../picopost.js"></script>
+  <script src="demo.js"></script>
+</body>
+</html>

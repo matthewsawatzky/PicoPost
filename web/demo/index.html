@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PicoPost demo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>PicoPost <span>demo</span></h1>
+    <p class="tagline">Tiny text infrastructure for the web.</p>
+  </header>
+
+  <main>
+    <section class="card" id="identity-card">
+      <h2>Identity</h2>
+      <div id="identity-status" class="muted">Loading…</div>
+      <form id="name-form" class="row">
+        <input id="name-input" type="text" maxlength="32" placeholder="Display name" autocomplete="off">
+        <button type="submit">Set name</button>
+        <button type="button" id="reset-identity" class="secondary">Reset</button>
+      </form>
+      <div id="identity-error" class="error" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2>Channel</h2>
+      <form id="channel-form" class="row">
+        <input id="channel-input" type="text" value="chat/general" autocomplete="off">
+        <button type="submit">Switch</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Send a post</h2>
+      <form id="post-form">
+        <textarea id="post-text" rows="3" maxlength="768" placeholder="Say something…"></textarea>
+        <div class="row">
+          <input id="meta-input" type="text" placeholder='Optional metadata, e.g. {"stars":5}' autocomplete="off">
+          <button type="submit">Send</button>
+        </div>
+      </form>
+      <div id="post-error" class="error" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2>Posts <span id="stream-badge" class="badge" hidden>live</span></h2>
+      <ul id="post-list" class="posts"></ul>
+    </section>
+  </main>
+
+  <script src="../picopost.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
