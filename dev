@@ -282,13 +282,33 @@ cmd_build() {
 
 # --- release ---------------------------------------------------------------
 
+# bump_version major|minor|patch <current> -> new version
+bump_version() {
+  local part="$1" cur="$2" major minor patch
+  major="${cur%%.*}"
+  rest="${cur#*.}"
+  minor="${rest%%.*}"
+  patch="${rest#*.}"
+  case "$part" in
+    major) major=$((major + 1)); minor=0; patch=0 ;;
+    minor) minor=$((minor + 1)); patch=0 ;;
+    patch) patch=$((patch + 1)) ;;
+    *) die "unknown bump type: $part (use major, minor, or patch)" ;;
+  esac
+  echo "$major.$minor.$patch"
+}
+
 cmd_release() {
-  local version="$VERSION"
-  local tag="v$version"
+  local bump="patch"
   local dry_run=0
-  if [[ "${1:-}" == "--dry-run" ]]; then
-    dry_run=1
-  fi
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --dry-run) dry_run=1 ;;
+      major|minor|patch) bump="$arg" ;;
+      *) die "usage: ./dev release [major|minor|patch] [--dry-run]" ;;
+    esac
+  done
 
   if ! command -v gh >/dev/null 2>&1; then
     die "gh (GitHub CLI) is required for releases: https://cli.github.com"
@@ -297,42 +317,55 @@ cmd_release() {
     die "gh is not authenticated; run: gh auth login"
   fi
 
+  local version new_version tag
+  version="$VERSION"
+  new_version="$(bump_version "$bump" "$version")"
+  tag="v$new_version"
+
   if [[ "$dry_run" -eq 0 ]] && git tag -l "$tag" | grep -q "$tag"; then
-    die "tag $tag already exists; bump VERSION first"
+    die "tag $tag already exists; choose a different bump"
   fi
+
+  log "releasing v$version -> v$new_version ($bump bump)"
 
   local dist="$ROOT/dist"
   rm -rf "$dist"
   mkdir -p "$dist"
 
-  log "building release binaries for v$version"
+  log "building release binaries for v$new_version"
   local targets=("darwin/amd64" "darwin/arm64" "linux/amd64" "linux/arm64")
-  local os arch ext name
+  local os arch name
   for target in "${targets[@]}"; do
     os="${target%/*}"
     arch="${target#*/}"
     name="picopost-${os}-${arch}"
     log "  $name"
-    GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -ldflags "$LDFLAGS" -o "$dist/$name" ./cmd/picopost
+    GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -ldflags "-X main.version=$new_version" -o "$dist/$name" ./cmd/picopost
   done
 
   # Checksums for the release assets.
   (cd "$dist" && shasum -a 256 picopost-* > checksums.txt)
 
   if [[ "$dry_run" -eq 1 ]]; then
-    log "dry run: binaries built in $dist (no tag or release created)"
+    log "dry run: binaries built in $dist (no version bump, tag, or release)"
     ls -lh "$dist"
     return
   fi
 
+  log "bumping VERSION to $new_version"
+  printf '%s\n' "$new_version" > "$ROOT/VERSION"
+  git add "$ROOT/VERSION"
+  git commit -m "release: v$new_version"
+
   log "creating tag $tag"
-  git tag -a "$tag" -m "PicoPost $version"
+  git tag -a "$tag" -m "PicoPost $new_version"
+  git push origin main
   git push origin "$tag"
 
   log "creating GitHub release $tag"
   gh release create "$tag" "$dist"/picopost-* "$dist/checksums.txt" \
-    --title "PicoPost $version" \
-    --notes "PicoPost $version. See the README for install and usage: https://github.com/matthewsawatzky/PicoPost#readme"
+    --title "PicoPost $new_version" \
+    --notes "PicoPost $new_version. See the README for install and usage: https://github.com/matthewsawatzky/PicoPost#readme"
 
   log "release published: https://github.com/matthewsawatzky/PicoPost/releases/tag/$tag"
 }
@@ -354,7 +387,7 @@ case "${1:-}" in
     ;;
   test) cmd_test ;;
   build) cmd_build ;;
-  release) cmd_release "${2:-}" ;;
+  release) cmd_release "${@:2}" ;;
   *)
     cat <<'EOF'
 PicoPost development helper
@@ -369,8 +402,9 @@ Usage:
   ./dev db info     show database information
   ./dev test        run Go tests
   ./dev build       build ./bin/picopost
-  ./dev release [--dry-run]  build multi-platform binaries and publish a
-                  GitHub release (requires gh CLI, uses VERSION file)
+  ./dev release [major|minor|patch] [--dry-run]
+                  bump VERSION, build multi-platform binaries, tag, and
+                  publish a GitHub release (requires gh CLI; default: patch)
 EOF
     ;;
 esac

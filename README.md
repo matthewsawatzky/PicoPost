@@ -73,18 +73,20 @@ Every build stamps it into the binary via `-ldflags "-X main.version=…"`,
 so `picopost version` always reports the real version — including
 multi-platform release binaries.
 
-To publish a release:
+Releases are fully automated — the version bumps itself:
 
 ```bash
-./dev release            # build darwin/linux amd64+arm64 binaries,
-                         # tag v<VERSION>, and create a GitHub release
-./dev release --dry-run  # build the binaries without tagging or publishing
+./dev release            # patch bump: 0.1.0 -> 0.1.1
+./dev release minor      # minor bump: 0.1.0 -> 0.2.0
+./dev release major      # major bump: 0.1.0 -> 1.0.0
+./dev release --dry-run  # build the binaries without bumping or publishing
 ```
 
-`./dev release` requires the `gh` CLI (authenticated) and refuses to run
-if the tag already exists — bump `VERSION` first. Release assets are named
-`picopost-<os>-<arch>` and ship with a `checksums.txt`; the install script
-picks the right one for the platform.
+`./dev release` bumps `VERSION`, commits it, builds darwin/linux amd64+arm64
+binaries, tags `v<version>`, pushes, and creates the GitHub release. It
+requires the `gh` CLI (authenticated) and refuses to run if the tag already
+exists. Release assets are named `picopost-<os>-<arch>` and ship with a
+`checksums.txt`; the install script picks the right one for the platform.
 
 ## Running
 
@@ -141,7 +143,7 @@ The `./dev` script starts the API plus a local demo site. No Docker needed.
 ./dev db info     # path, size, schema version, post/identity counts
 ./dev test        # run the Go test suite
 ./dev build       # build ./bin/picopost
-./dev release     # build multi-platform binaries + publish a GitHub release
+./dev release     # bump VERSION, build binaries, publish a GitHub release
 ```
 
 After `./dev start`:
