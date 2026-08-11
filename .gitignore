@@ -1,6 +1,7 @@
 /bin/
 /data/
 /.dev/
+/dist/
 picopost.toml
 *.db
 *.db-wal

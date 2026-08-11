@@ -17,7 +17,9 @@ import (
 	"github.com/matthewsawatzky/PicoPost/internal/server"
 )
 
-const version = "0.1.0"
+// Version is stamped at build time via -ldflags "-X main.version=...".
+// The default is "dev" so local builds are clearly identifiable.
+var version = "dev"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {

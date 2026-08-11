@@ -62,7 +62,29 @@ prebuilt binary matches your platform):
 curl -fsSL https://raw.githubusercontent.com/matthewsawatzky/PicoPost/main/install.sh | sh
 ```
 
-The binary lands in `~/.local/bin` (or `~/bin` if it exists).
+The binary lands in `~/.local/bin` (or `~/bin` if it exists). The script
+prints the version it is installing, and a source build leaves the
+checkout in `./picopost` in the directory where you ran it.
+
+## Versioning and releases
+
+The current version lives in the `VERSION` file (semver, no `v` prefix).
+Every build stamps it into the binary via `-ldflags "-X main.version=…"`,
+so `picopost version` always reports the real version — including
+multi-platform release binaries.
+
+To publish a release:
+
+```bash
+./dev release            # build darwin/linux amd64+arm64 binaries,
+                         # tag v<VERSION>, and create a GitHub release
+./dev release --dry-run  # build the binaries without tagging or publishing
+```
+
+`./dev release` requires the `gh` CLI (authenticated) and refuses to run
+if the tag already exists — bump `VERSION` first. Release assets are named
+`picopost-<os>-<arch>` and ship with a `checksums.txt`; the install script
+picks the right one for the platform.
 
 ## Running
 
@@ -119,6 +141,7 @@ The `./dev` script starts the API plus a local demo site. No Docker needed.
 ./dev db info     # path, size, schema version, post/identity counts
 ./dev test        # run the Go test suite
 ./dev build       # build ./bin/picopost
+./dev release     # build multi-platform binaries + publish a GitHub release
 ```
 
 After `./dev start`:
